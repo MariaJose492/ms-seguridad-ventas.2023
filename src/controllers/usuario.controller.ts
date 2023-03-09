@@ -9,11 +9,11 @@ import {
 } from '@loopback/repository';
 import {
   del, get,
-  getModelSchemaRef, param, patch, post, put, requestBody,
+  getModelSchemaRef, HttpErrors, param, patch, post, put, requestBody,
   response
 } from '@loopback/rest';
-import {Usuario} from '../models';
-import {UsuarioRepository} from '../repositories';
+import {Credenciales, Login, Usuario} from '../models';
+import {LoginRepository, UsuarioRepository} from '../repositories';
 import {SeguridadUsuarioService} from '../services';
 
 export class UsuarioController {
@@ -21,7 +21,9 @@ export class UsuarioController {
     @repository(UsuarioRepository)
     public usuarioRepository : UsuarioRepository,
     @service(SeguridadUsuarioService)
-    public servicioSeguridad: SeguridadUsuarioService
+    public servicioSeguridad: SeguridadUsuarioService,
+    @repository(LoginRepository)
+    public repositorioLogin: LoginRepository
   ) {}
 
   @post('/usuario')
@@ -43,7 +45,7 @@ export class UsuarioController {
     usuario: Omit<Usuario, '_id'>,
   ): Promise<Usuario> {
     //crear la clave
-    let clave = this.servicioSeguridad.crearClave();
+    let clave = this.servicioSeguridad.crearTextoAleatorio(10);
     console.log(clave);
     //cifrar la clave
     let claveCifrada = this.servicioSeguridad.cifrarTexto(clave);
@@ -153,4 +155,38 @@ export class UsuarioController {
   async deleteById(@param.path.string('id') id: string): Promise<void> {
     await this.usuarioRepository.deleteById(id);
   }
+
+  /**
+   * Métodos personalizados para la API
+   */
+@post("/identificar-usuario")
+@response(200, {
+  descripcion:"Identificar un usuario por coreeo y clave",
+  content:{'aplication/json': {schema: getModelSchemaRef(Credenciales)}}
+})
+async identificarUsuario(
+  @requestBody({
+    content:{
+      'aplication/json':{
+        schema: getModelSchemaRef(Credenciales)
+      }
+    }
+  })
+  credenciales: Credenciales
+): Promise<object> {
+let usuario = await this.servicioSeguridad.identificarUsuario(credenciales);
+if (usuario){
+  let codigo2fa = this.servicioSeguridad.crearTextoAleatorio(5);
+  let login: Login = new Login();
+  login.usuarioId = usuario._id!;
+  login.codigo2fa = codigo2fa;
+  login.estadoCodigo2fa = false;
+  login.token = "";
+  login.estadoToken = false;
+  this.repositorioLogin.create(login);
+  //notificar al usuario via correo o sms
+  return usuario;
+}
+return new HttpErrors[401]("Credenciales incorrectas");
+}
 }
