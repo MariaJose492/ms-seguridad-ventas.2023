@@ -1,7 +1,7 @@
 import { /* inject, */ BindingScope, injectable} from '@loopback/core';
 import {repository} from '@loopback/repository';
-import {Credenciales, Usuario} from '../models';
-import {UsuarioRepository} from '../repositories';
+import {Credenciales, FactorDeAutenticacionPorCodigo, Usuario} from '../models';
+import {LoginRepository, UsuarioRepository} from '../repositories';
 const generator = require('generate-password');
 const MD5 = require("crypto-js/md5");
 
@@ -9,7 +9,9 @@ const MD5 = require("crypto-js/md5");
 export class SeguridadUsuarioService {
   constructor(
     @repository(UsuarioRepository)
-    public repositorioUsuario: UsuarioRepository
+    public repositorioUsuario: UsuarioRepository,
+    @repository(LoginRepository)
+    public repositorioLogin: LoginRepository
   ) {}
 
   /*
@@ -49,6 +51,26 @@ export class SeguridadUsuarioService {
     return usuario as Usuario;
   }
 
+
+  /**
+   * valid un código de 2fa para un usuario
+   * @param credenciales2fa credenciales del usuatio con el 2fa
+   * @returns el registro de login o null
+   */
+  async validarCodigo2fa(credenciales2fa: FactorDeAutenticacionPorCodigo): Promise<Usuario| null>{
+    let login = await this.repositorioLogin.findOne({
+      where:{
+        usuarioId: credenciales2fa.usuarioId,
+        codigo2fa: credenciales2fa.codigo2fa,
+        estadoCodigo2fa: false
+      }
+    })
+    if(login){
+      let usuario = await this.repositorioUsuario.findById(credenciales2fa.usuarioId);
+      return usuario;
+    }
+    return null;
+  }
 
 
 }
