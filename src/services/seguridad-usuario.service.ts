@@ -1,9 +1,11 @@
 import { /* inject, */ BindingScope, injectable} from '@loopback/core';
 import {repository} from '@loopback/repository';
+import {ConfiguracionSeguridad} from '../config/seguridad.config';
 import {Credenciales, FactorDeAutenticacionPorCodigo, Usuario} from '../models';
 import {LoginRepository, UsuarioRepository} from '../repositories';
 const generator = require('generate-password');
 const MD5 = require("crypto-js/md5");
+const jwt = require ("jsonwebtoken");
 
 @injectable({scope: BindingScope.TRANSIENT})
 export class SeguridadUsuarioService {
@@ -53,7 +55,7 @@ export class SeguridadUsuarioService {
 
 
   /**
-   * valid un código de 2fa para un usuario
+   * Valida un código de 2fa para un usuario
    * @param credenciales2fa credenciales del usuatio con el 2fa
    * @returns el registro de login o null
    */
@@ -72,5 +74,20 @@ export class SeguridadUsuarioService {
     return null;
   }
 
+  /**
+   * Generación JWT
+   * @param usuario información del usuario
+   * @returns token
+   */
+
+  crearToken(usuario: Usuario):string{
+    let datos = {
+      name: `${usuario.primerNombre} ${usuario.segundoNombre} ${usuario.primerApellido} ${usuario.segundoApellido}`,
+      role: usuario.rolId,
+      email: usuario.correo
+    };
+    let token = jwt.sign(datos, ConfiguracionSeguridad.claveJWT);
+    return token;
+  };
 
 }
